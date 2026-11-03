@@ -1,0 +1,52 @@
+
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+    }
+
+    stages {
+
+        stage('1. Checkout') {
+            steps {
+                echo '=== Checkout  ==='
+                git url: 'https://github.com/marambouassida/projetJenkins.git',
+                    branch: 'main'
+            }
+        }
+
+        stage('2. Build') {
+            steps {
+                sh 'echo === Build ==='
+                sh 'ls -la'
+                sh 'echo Build terminé avec succès'
+            }
+        }
+
+        stage('3. Test') {
+            steps {
+                sh 'echo === Test  ==='
+                sh 'git status'
+                sh 'echo Tests terminés avec succès'
+            }
+        }
+
+        stage('4. Delivery') {
+            steps {
+                sh 'echo === Delivery ==='
+                sh 'echo Le fichier index.html est prêt à être livré'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline terminé : SUCCESS'
+        }
+
+        failure {
+            echo 'Pipeline terminé : FAILURE'
+        }
+    }
+}
