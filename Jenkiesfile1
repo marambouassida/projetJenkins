@@ -6,6 +6,11 @@ pipeline {
         timestamps()
     }
 
+    environment {
+        IMAGE = 'mrmdocker123/monapp'
+        TAG = "${BUILD_NUMBER}"
+    }
+
     stages {
 
         stage('1. Checkout') {
@@ -16,26 +21,48 @@ pipeline {
             }
         }
 
-        stage('2. Build') {
+        stage('2. Docker Build') {
             steps {
-                bat 'echo === Build ==='
-                bat 'dir'
-                bat 'echo Build termine avec succes'
+                bat 'docker version'
+                bat 'docker build -t %IMAGE%:%TAG% .'
             }
         }
 
-        stage('3. Test') {
+        stage('3. Smoke Test') {
             steps {
-                bat 'echo === Test ==='
-                bat 'git status'
-                bat 'echo Tests termines avec succes'
+                bat '''
+                docker rm -f monapp_test 2>nul || ver > nul
+                docker run -d --name monapp_test -p 8081:80 %IMAGE%:%TAG%
+                ping -n 3 127.0.0.1 > nul
+                curl -I http://localhost:8081 | find "200 OK"
+                docker rm -f monapp_test
+                '''
             }
         }
 
-        stage('4. Delivery') {
+        stage('4. Push Docker Hub') {
             steps {
-                bat 'echo === Delivery ==='
-                bat 'echo Le fichier index.html est pret a etre livre'
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'USER',
+                    passwordVariable: 'PASS'
+                )]) {
+                    bat '''
+                    echo %PASS% | docker login -u %USER% --password-stdin
+                    docker tag %IMAGE%:%TAG% %IMAGE%:latest
+                    docker push %IMAGE%:%TAG%
+                    docker push %IMAGE%:latest
+                    docker logout
+                    '''
+                }
+            }
+        }
+
+        stage('5. Deploy') {
+            steps {
+                bat 'docker compose pull'
+                bat 'docker compose up -d'
+                bat 'docker ps'
             }
         }
     }
@@ -46,6 +73,7 @@ pipeline {
         }
 
         failure {
+            bat 'docker rm -f monapp_test 2>nul || ver > nul'
             echo 'Pipeline termine : FAILURE'
         }
     }
